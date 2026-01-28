@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
 import { Float, Environment, MeshDistortMaterial, Icosahedron } from '@react-three/drei';
@@ -52,13 +52,13 @@ const Dashboard = () => {
                 const config = { headers: { 'x-auth-token': token } };
 
                 const jobsEndpoint = user.role === 'interviewer'
-                    ? 'http://localhost:5000/api/jobs/my-jobs'
-                    : 'http://localhost:5000/api/jobs';
+                    ? '/jobs/my-jobs'
+                    : '/jobs';
 
                 // Parallel fetch
                 const [jobsRes, appsRes] = await Promise.all([
-                    axios.get(jobsEndpoint, config),
-                    user.role === 'candidate' ? axios.get('http://localhost:5000/api/applications/my', config) : Promise.resolve({ data: [] })
+                    api.get(jobsEndpoint, config),
+                    user.role === 'candidate' ? api.get('/applications/my', config) : Promise.resolve({ data: [] })
                 ]);
 
                 // Ensure data is array
@@ -82,7 +82,7 @@ const Dashboard = () => {
             setLoadingCandidates(true);
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get(`http://localhost:5000/api/applications/job/${activeJobId}`, {
+                const res = await api.get(`/applications/job/${activeJobId}`, {
                     headers: { 'x-auth-token': token }
                 });
                 setJobCandidates(Array.isArray(res.data) ? res.data : []);
@@ -107,7 +107,7 @@ const Dashboard = () => {
         setIsOpenToWork(newValue);
         try {
             const token = localStorage.getItem('token');
-            await axios.put('http://localhost:5000/api/auth/profile', { isOpenToWork: newValue }, {
+            await api.put('/auth/profile', { isOpenToWork: newValue }, {
                 headers: { 'x-auth-token': token }
             });
         } catch (err) {
@@ -137,11 +137,11 @@ const Dashboard = () => {
             // Fast Track Apply
             try {
                 const token = localStorage.getItem('token');
-                await axios.post(`http://localhost:5000/api/applications/apply/${job._id}`, {}, {
+                await api.post(`/applications/apply/${job._id}`, {}, {
                     headers: { 'x-auth-token': token }
                 });
                 alert('Application sent successfully!');
-                const res = await axios.get('http://localhost:5000/api/applications/my', { headers: { 'x-auth-token': token } });
+                const res = await api.get('/applications/my', { headers: { 'x-auth-token': token } });
                 setApplications(Array.isArray(res.data) ? res.data : []);
             } catch (err) {
                 console.error(err);
@@ -167,7 +167,7 @@ const Dashboard = () => {
                 data.append('resume', applyFormData.resume);
             }
 
-            await axios.post(`http://localhost:5000/api/applications/apply/${selectedJobForApply._id}`, data, {
+            await api.post(`/applications/apply/${selectedJobForApply._id}`, data, {
                 headers: {
                     'x-auth-token': token,
                     'Content-Type': 'multipart/form-data'
@@ -176,7 +176,7 @@ const Dashboard = () => {
 
             alert('Manual Application sent successfully!');
             setSelectedJobForApply(null); // Close modal
-            const res = await axios.get('http://localhost:5000/api/applications/my', { headers: { 'x-auth-token': token } });
+            const res = await api.get('/applications/my', { headers: { 'x-auth-token': token } });
             setApplications(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error(err);
@@ -188,7 +188,7 @@ const Dashboard = () => {
         try {
             const token = localStorage.getItem('token');
             const config = { headers: { 'x-auth-token': token } };
-            await axios.put(`http://localhost:5000/api/applications/${appId}/status`, { status: 'shortlisted' }, config);
+            await api.put(`/applications/${appId}/status`, { status: 'shortlisted' }, config);
 
             // Update local state to show shortlisted status
             setJobCandidates(prev => prev.map(app =>

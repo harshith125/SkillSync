@@ -2,7 +2,7 @@ import { useState, useContext, useEffect, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
-import axios from 'axios';
+import api from '../api';
 import AuthContext from '../context/AuthContext';
 import ProfileIdentity from '../components/ProfileIdentity';
 import './Profile.css';
@@ -161,7 +161,7 @@ const Profile = () => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.put('http://localhost:5000/api/auth/profile', payload, {
+            await api.put('/auth/profile', payload, {
                 headers: { 'x-auth-token': token }
             });
             await loadUser();
@@ -185,7 +185,7 @@ const Profile = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/auth/profile-picture', formData, {
+            const res = await api.post('/auth/profile-picture', formData, {
                 headers: {
                     'x-auth-token': token
                 }

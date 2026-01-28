@@ -1,6 +1,6 @@
 import { useState, useContext, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api';
 import { motion } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
 import { Float, Environment, Sphere, MeshDistortMaterial } from '@react-three/drei';
@@ -48,7 +48,7 @@ const PostJob = () => {
     const onSubmit = async e => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:5000/api/jobs', formData);
+            await api.post('/jobs', formData);
             setShowSuccess(true);
         } catch (err) {
             console.error(err);

@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const AuthContext = createContext();
 
@@ -14,15 +14,15 @@ export const AuthProvider = ({ children }) => {
 
     const loadUser = async () => {
         if (localStorage.getItem('token')) {
-            axios.defaults.headers.common['x-auth-token'] = localStorage.getItem('token');
+            api.defaults.headers.common['x-auth-token'] = localStorage.getItem('token');
         } else {
-            delete axios.defaults.headers.common['x-auth-token'];
+            delete api.defaults.headers.common['x-auth-token'];
             setLoading(false);
             return;
         }
 
         try {
-            const res = await axios.get('http://localhost:5000/api/auth/me');
+            const res = await api.get('/auth/me');
             setUser(res.data);
             setIsAuthenticated(true);
             return res.data;
@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (formData) => {
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/register', formData);
+            const res = await api.post('/auth/register', formData);
             localStorage.setItem('token', res.data.token);
             await loadUser();
             return { success: true };
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (formData) => {
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/login', formData);
+            const res = await api.post('/auth/login', formData);
             localStorage.setItem('token', res.data.token);
             const user = await loadUser();
             return { success: true, user };
@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('token');
         setUser(null);
         setIsAuthenticated(false);
-        delete axios.defaults.headers.common['x-auth-token'];
+        delete api.defaults.headers.common['x-auth-token'];
     };
 
     return (

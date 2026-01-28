@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import AtsScanner from '../components/AtsScanner';
 import { useDropzone } from 'react-dropzone';
-import axios from 'axios';
+import api from '../api';
 import '../styles/Form.css';
 import './ATS.css';
 
@@ -28,9 +28,9 @@ const ATS = () => {
         try {
             const token = localStorage.getItem('token');
             if (token) {
-                axios.defaults.headers.common['x-auth-token'] = token;
+                api.defaults.headers.common['x-auth-token'] = token;
             }
-            const res = await axios.get('http://localhost:5000/api/applications/my');
+            const res = await api.get('/applications/my');
             setApplications(res.data);
 
             if (res.data.length > 0) {
@@ -77,7 +77,7 @@ const ATS = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/ats/analyze', formData, {
+            const res = await api.post('/ats/analyze', formData, {
                 headers: {
                     'x-auth-token': token
                 }
