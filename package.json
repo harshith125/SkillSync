@@ -33,6 +33,8 @@
     "vite": "^7.2.4"
   },
   "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom",
     "@types/react": "$@types/react",
     "@types/react-dom": "$@types/react-dom"
   }
