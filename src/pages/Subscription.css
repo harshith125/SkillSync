@@ -1,0 +1,294 @@
+.subscription-page-container {
+    max-width: 1180px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.sub-header-center {
+    text-align: center;
+    max-width: 680px;
+    margin: 0 auto 20px auto;
+}
+
+.sub-header-center h1 {
+    font-size: 1.85rem;
+    font-weight: 800;
+    margin: 8px 0;
+    color: #0f172a;
+}
+
+.sub-header-center p {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Already PRO Banner */
+.already-pro-banner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+}
+
+.pro-star-badge {
+    font-size: 1.8rem;
+}
+
+.already-pro-banner strong {
+    color: #166534;
+    font-size: 0.95rem;
+}
+
+.already-pro-banner p {
+    color: #15803d;
+    font-size: 0.8rem;
+}
+
+/* Subscription Grid Layout */
+.subscription-grid-layout {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
+.plans-cards-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.plan-tier-card {
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.plan-tier-card:hover {
+    border-color: var(--border-medium);
+    background: #f8fafc;
+}
+
+.plan-tier-card.selected {
+    border-color: var(--primary);
+    background: #eff6ff;
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.plan-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.plan-radio-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.plan-radio-row input[type="radio"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+}
+
+.plan-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.plan-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.plan-price {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.plan-duration {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.savings-pill {
+    background: var(--emerald-subtle);
+    color: var(--emerald);
+    border: 1px solid var(--emerald-border);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.plan-desc {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* Features Included */
+.features-included-card {
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+}
+
+.features-included-card h4 {
+    font-size: 0.88rem;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+.pro-features-checklist {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.pro-features-checklist li {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.pro-features-checklist strong {
+    color: var(--text-primary);
+}
+
+/* Payment Checkout Column (Right) */
+.payment-checkout-col {
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 22px;
+}
+
+.checkout-title-box {
+    margin-bottom: 14px;
+}
+
+.checkout-title-box h3 {
+    font-size: 1.05rem;
+    font-weight: 800;
+}
+
+.checkout-title-box p {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.qr-display-box {
+    background: #f8fafc;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.qr-image-wrapper {
+    background: #ffffff;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-xs);
+    margin-bottom: 12px;
+}
+
+.qr-image-tag {
+    width: 170px;
+    height: 170px;
+    object-fit: contain;
+    display: block;
+}
+
+.qr-payment-amount {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.amount-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+
+.amount-val {
+    font-family: var(--font-heading);
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1.1;
+}
+
+.amount-plan-name {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
+.upi-app-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.upi-chip {
+    background: #ffffff;
+    border: 1px solid var(--border-medium);
+    padding: 2px 7px;
+    border-radius: var(--radius-xs);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.utr-submit-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.instant-notice {
+    margin-top: 10px;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+    .subscription-grid-layout {
+        grid-template-columns: 1fr;
+    }
+}

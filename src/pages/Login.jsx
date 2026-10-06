@@ -1,188 +1,146 @@
 import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Canvas } from '@react-three/fiber';
-import { Float, MeshDistortMaterial, Sphere, Environment } from '@react-three/drei';
 import AuthContext from '../context/AuthContext';
 import '../styles/Form.css';
-
-const LoginVisual3D = ({ color }) => {
-    return (
-        <Float speed={2} rotationIntensity={1.5} floatIntensity={2}>
-            <Sphere args={[1, 64, 64]} scale={2.4}>
-                <MeshDistortMaterial
-                    color={color}
-                    envMapIntensity={0.6}
-                    clearcoat={1}
-                    clearcoatRoughness={0.1}
-                    metalness={0.1}
-                    distort={0.4}
-                    speed={2}
-                />
-            </Sphere>
-        </Float>
-    );
-};
 
 const Login = () => {
     const navigate = useNavigate();
     const { login } = useContext(AuthContext);
 
-    // Although the backend doesn't require role for login (email is unique), 
-    // the user requested to ask "who is logging in".
     const [role, setRole] = useState('candidate'); // 'candidate' or 'interviewer'
-
     const [formData, setFormData] = useState({
         email: '',
         password: ''
     });
+    const [errorMsg, setErrorMsg] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const { email, password } = formData;
 
-    const [error, setError] = useState('');
-
-    const onChange = e => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-        if (error) setError(''); // Clear error on typing
-    };
+    const onChange = e => setFormData({
+        ...formData,
+        [e.target.name]: e.target.value
+    });
 
     const onSubmit = async e => {
         e.preventDefault();
-        setError(''); // Clear previous errors
-        const res = await login({ email, password });
-        if (res.success) {
-            if (res.user.role === 'interviewer') {
-                navigate('/company-dashboard');
-            } else if (res.user.role === 'candidate') {
-                navigate('/candidate-dashboard');
+        setErrorMsg('');
+        setSubmitting(true);
+        try {
+            const res = await login({ email, password });
+            if (res.success) {
+                if (res.user.role === 'interviewer') {
+                    navigate('/dashboard');
+                } else if (res.user.role === 'candidate') {
+                    navigate('/dashboard');
+                } else {
+                    navigate('/dashboard');
+                }
             } else {
-                navigate('/dashboard');
+                setErrorMsg(res.msg || 'Invalid email or password. Please try again.');
             }
-        } else {
-            setError(res.msg); // Set error message
+        } catch (err) {
+            setErrorMsg('Authentication service unavailable. Please check backend connection.');
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    const isCandidate = role === 'candidate';
-    const primaryColor = isCandidate ? '#6366f1' : '#0ea5e9'; // Indigo vs Sky Blue
-    const secondaryColor = isCandidate ? '#ec4899' : '#10b981'; // Pink vs Emerald
-
     return (
-        <div style={{ position: 'relative', minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="form-container"
-                style={{
-                    perspective: 1000,
-                    zIndex: 10,
-                    margin: 0,
-                    '--primary': primaryColor,
-                    '--secondary': secondaryColor,
-                    '--primary-hover': isCandidate ? '#4f46e5' : '#0284c7'
-                }}
-            >
-                <div className="form-left" style={{ position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-                        <Canvas camera={{ position: [0, 0, 5] }}>
-                            <ambientLight intensity={0.5} />
-                            <pointLight position={[10, 10, 10]} intensity={1.5} color={primaryColor} />
-                            <LoginVisual3D color={primaryColor} />
-                            <Environment preset="city" />
-                        </Canvas>
+        <div className="form-container">
+            <h2 className="form-title">Welcome Back</h2>
+            <p className="form-subtitle">Sign in to your SkillSync account</p>
+
+            <div className="role-toggle">
+                <button
+                    type="button"
+                    className={`role-btn ${role === 'candidate' ? 'active' : ''}`}
+                    onClick={() => setRole('candidate')}
+                >
+                    🎓 Candidate
+                </button>
+                <button
+                    type="button"
+                    className={`role-btn ${role === 'interviewer' ? 'active' : ''}`}
+                    onClick={() => setRole('interviewer')}
+                >
+                    🏢 Recruiter
+                </button>
+            </div>
+
+            {errorMsg && (
+                <div className="auth-error-box">
+                    <span>⚠️</span>
+                    <div>{errorMsg}</div>
+                </div>
+            )}
+
+            <form onSubmit={onSubmit}>
+                <div className="form-group">
+                    <label className="form-label">Email Address</label>
+                    <input
+                        type="email"
+                        name="email"
+                        value={email}
+                        onChange={onChange}
+                        placeholder={role === 'candidate' ? 'name@example.com' : 'recruiter@company.com'}
+                        className="form-input"
+                        required
+                    />
+                </div>
+
+                <div className="form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <label className="form-label" style={{ marginBottom: 0 }}>Password</label>
+                        <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
+                            Forgot password?
+                        </Link>
                     </div>
-                    <div style={{ position: 'relative', zIndex: 1 }}>
-                        <h1 className="visual-title">
-                            {isCandidate ? 'Unlock Your\nPotential.' : 'Find Your\nNext Star.'}
-                        </h1>
-                        <p className="visual-text">
-                            {isCandidate
-                                ? 'Join thousands of professionals finding their dream jobs through 3D immersive matchmaking.'
-                                : 'Connect with top-tier talent using our AI-driven applicant tracking system.'}
-                        </p>
+                    <div className="password-input-wrapper">
+                        <input
+                            type={showPassword ? 'text' : 'password'}
+                            name="password"
+                            value={password}
+                            onChange={onChange}
+                            placeholder="••••••••"
+                            className="form-input"
+                            required
+                        />
+                        <button
+                            type="button"
+                            className="password-toggle-btn"
+                            onClick={() => setShowPassword(!showPassword)}
+                            title={showPassword ? 'Hide password' : 'Show password'}
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                            {showPassword ? (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
+                            ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                                    <line x1="1" y1="1" x2="23" y2="23" />
+                                </svg>
+                            )}
+                        </button>
                     </div>
                 </div>
 
-                <div className="form-right">
-                    <h2 className="form-title">
-                        {isCandidate ? 'Candidate Portal' : 'Company Access'}
-                    </h2>
-                    <p className="form-subtitle">Please enter your details to sign in.</p>
+                <button 
+                    type="submit" 
+                    className="btn-block"
+                    disabled={submitting}
+                >
+                    {submitting ? 'Signing In...' : `Sign In as ${role === 'candidate' ? 'Candidate' : 'Recruiter'}`}
+                </button>
+            </form>
 
-                    <div className="role-toggle" style={{ marginBottom: '2rem' }}>
-                        <button
-                            className={`role-btn ${role === 'candidate' ? 'active' : ''}`}
-                            onClick={() => { setRole('candidate'); setError(''); }}
-                        >
-                            Candidate
-                        </button>
-                        <button
-                            className={`role-btn ${role === 'interviewer' ? 'active' : ''}`}
-                            onClick={() => { setRole('interviewer'); setError(''); }}
-                        >
-                            Company
-                        </button>
-                    </div>
-
-                    <form onSubmit={onSubmit}>
-                        {/* Error Message Display */}
-                        {error && (
-                            <div style={{
-                                background: '#fee2e2',
-                                color: '#ef4444',
-                                padding: '0.75rem',
-                                borderRadius: '8px',
-                                marginBottom: '1.5rem',
-                                fontSize: '0.9rem',
-                                fontWeight: '600',
-                                textAlign: 'center',
-                                border: '1px solid #fecaca'
-                            }}>
-                                ⚠️ {error}
-                            </div>
-                        )}
-
-                        <div className="form-group">
-                            <label className="form-label">Email Address</label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={email}
-                                onChange={onChange}
-                                className="form-input"
-                                required
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Password</label>
-                            <input
-                                type="password"
-                                name="password"
-                                value={password}
-                                onChange={onChange}
-                                className="form-input"
-                                required
-                            />
-                        </div>
-                        <button type="submit" className="btn-block">
-                            {isCandidate ? 'Login as Candidate' : 'Login as Company'}
-                        </button>
-
-                        <div style={{ marginTop: '2rem', textAlign: 'center', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '1.5rem' }}>
-                            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>New to SkillSync?</p>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <Link to="/register?role=candidate" className="btn-outline-glass" style={{ textAlign: 'center' }}>
-                                    Join
-                                </Link>
-                                <Link to="/register?role=interviewer" className="btn-outline-glass" style={{ textAlign: 'center' }}>
-                                    Hire
-                                </Link>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </motion.div>
+            <div className="form-footer">
+                Don't have an account? <Link to="/register">Create an Account</Link>
+            </div>
         </div>
     );
 };

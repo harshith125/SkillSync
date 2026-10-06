@@ -1,649 +1,830 @@
-import { useContext, useEffect, useState, Suspense } from 'react';
-import { Link } from 'react-router-dom';
-import api from '../api';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Canvas } from '@react-three/fiber';
-import { Float, Environment, MeshDistortMaterial, Icosahedron } from '@react-three/drei';
+import { useContext, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
+import { jobsAPI, applicationsAPI, googleAPI } from '../api';
 import './Dashboard.css';
-
-const DashboardVisual3D = () => {
-    return (
-        <Float speed={2} rotationIntensity={1} floatIntensity={1}>
-            <Icosahedron args={[1, 1]} scale={2}>
-                <MeshDistortMaterial
-                    color="#6366f1"
-                    speed={2}
-                    distort={0.4}
-                    radius={1}
-                    metalness={0.5}
-                    roughness={0.2}
-                />
-            </Icosahedron>
-        </Float>
-    );
-};
 
 const Dashboard = () => {
     const { user } = useContext(AuthContext);
+    const navigate = useNavigate();
+
     const [jobs, setJobs] = useState([]);
-    const [applications, setApplications] = useState([]);
+    const [myApplications, setMyApplications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [actionMsg, setActionMsg] = useState('');
+    const [errorMsg, setErrorMsg] = useState('');
 
-    // State for Company View
-    const [activeJobId, setActiveJobId] = useState(null);
-    const [jobCandidates, setJobCandidates] = useState([]);
+    // Recruiter-specific state
+    const [jobFilterTab, setJobFilterTab] = useState('all'); // 'all' | 'active' | 'closed'
+    const [selectedJobId, setSelectedJobId] = useState(null);
+    const [selectedJob, setSelectedJob] = useState(null);
+    const [candidates, setCandidates] = useState([]);
     const [loadingCandidates, setLoadingCandidates] = useState(false);
+    const [stageFilter, setStageFilter] = useState('All');
+    const [googleStatus, setGoogleStatus] = useState({ connected: false, googleEmail: null });
+    const [connectingGoogle, setConnectingGoogle] = useState(false);
 
-    // Smart Apply State
-    const [selectedJobForApply, setSelectedJobForApply] = useState(null);
-    const [applyFormData, setApplyFormData] = useState({
-        relevantProjects: '',
-        relevantExperience: '',
-        resume: null
+    // Candidate-specific state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [candidateTab, setCandidateTab] = useState('browse'); // 'browse' | 'applications'
+
+    // Initial Load
+    useEffect(() => {
+        if (!user) return;
+        loadDashboardData();
+        if (user.role === 'interviewer') {
+            loadGoogleStatus();
+        }
+    }, [user]);
+
+    const loadDashboardData = async () => {
+        try {
+            setLoading(true);
+            setErrorMsg('');
+            if (user?.role === 'interviewer') {
+                const res = await jobsAPI.getMyJobs();
+                const jobList = Array.isArray(res.data) ? res.data : [];
+                setJobs(jobList);
+                if (jobList.length > 0 && !selectedJobId) {
+                    selectJobForCandidates(jobList[0]._id, jobList[0]);
+                }
+            } else {
+                const [jobsRes, appsRes] = await Promise.all([
+                    jobsAPI.getAll(),
+                    applicationsAPI.getMyApplications().catch(() => ({ data: [] }))
+                ]);
+                setJobs(Array.isArray(jobsRes.data) ? jobsRes.data : []);
+                setMyApplications(Array.isArray(appsRes.data) ? appsRes.data : []);
+            }
+        } catch (err) {
+            setErrorMsg('Unable to retrieve dashboard information. Please verify your connection.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadGoogleStatus = async () => {
+        try {
+            const res = await googleAPI.getStatus();
+            setGoogleStatus(res.data);
+        } catch (err) {
+            console.warn('[Google Status Error]:', err.message);
+        }
+    };
+
+    // Recruiter: Select job to view applicants
+    const selectJobForCandidates = async (jobId, jobObj) => {
+        setSelectedJobId(jobId);
+        setSelectedJob(jobObj);
+        setStageFilter('All');
+        try {
+            setLoadingCandidates(true);
+            const res = await applicationsAPI.getByJob(jobId);
+            setCandidates(res.data.applications || []);
+            if (res.data.job) {
+                setSelectedJob(res.data.job);
+            }
+        } catch (err) {
+            console.error('Error loading candidates:', err);
+        } finally {
+            setLoadingCandidates(false);
+        }
+    };
+
+    // Recruiter: Connect Google Calendar via OAuth (PRO Feature)
+    const handleConnectGoogle = async () => {
+        if (!user?.isPro) {
+            navigate('/subscription');
+            return;
+        }
+        try {
+            setConnectingGoogle(true);
+            const res = await googleAPI.getAuthUrl();
+            if (res.data?.url) {
+                window.location.href = res.data.url;
+            }
+        } catch (err) {
+            if (err.response?.status === 403 || err.response?.data?.requiresPro) {
+                navigate('/subscription');
+            } else {
+                setErrorMsg('Failed to initiate Google authorization.');
+            }
+            setConnectingGoogle(false);
+        }
+    };
+
+    // Recruiter: Disconnect Google Calendar
+    const handleDisconnectGoogle = async () => {
+        if (!window.confirm('Disconnect your Google account from SkillSync?')) return;
+        try {
+            await googleAPI.disconnect();
+            setGoogleStatus({ connected: false, googleEmail: null });
+            setActionMsg('Google Calendar disconnected successfully.');
+        } catch (err) {
+            setErrorMsg('Failed to disconnect Google Calendar.');
+        }
+    };
+
+    // Recruiter: Toggle Job Status (active / closed) via PATCH
+    const handleToggleJobStatus = async (jobId, currentStatus) => {
+        const nextStatus = currentStatus === 'active' ? 'closed' : 'active';
+        try {
+            await jobsAPI.patchStatus(jobId, nextStatus);
+            setJobs(jobs.map(j => j._id === jobId ? { ...j, status: nextStatus } : j));
+            if (selectedJob && selectedJob._id === jobId) {
+                setSelectedJob({ ...selectedJob, status: nextStatus });
+            }
+            setActionMsg(`Job status updated to "${nextStatus}".`);
+        } catch (err) {
+            setErrorMsg(err.response?.data?.msg || 'Failed to update job status.');
+        }
+    };
+
+    // Recruiter: Close Job & Send Leaderboard via PUT
+    const handleCloseJobAndEmail = async (jobId) => {
+        if (!window.confirm('Close this job posting and send candidate ranking report to your email?')) return;
+        try {
+            const res = await jobsAPI.close(jobId);
+            setJobs(jobs.map(j => j._id === jobId ? { ...j, status: 'closed' } : j));
+            if (selectedJob && selectedJob._id === jobId) {
+                setSelectedJob({ ...selectedJob, status: 'closed' });
+            }
+            setActionMsg(res.data?.msg || 'Job closed. Leaderboard report emailed.');
+        } catch (err) {
+            setErrorMsg(err.response?.data?.msg || 'Failed to close job.');
+        }
+    };
+
+    // Recruiter: Delete Job via DELETE
+    const handleDeleteJob = async (jobId) => {
+        if (!window.confirm('Permanently delete this job and all its candidate records?')) return;
+        try {
+            await jobsAPI.delete(jobId);
+            const remaining = jobs.filter(j => j._id !== jobId);
+            setJobs(remaining);
+            if (selectedJobId === jobId) {
+                if (remaining.length > 0) {
+                    selectJobForCandidates(remaining[0]._id, remaining[0]);
+                } else {
+                    setSelectedJobId(null);
+                    setSelectedJob(null);
+                    setCandidates([]);
+                }
+            }
+            setActionMsg('Job posting deleted successfully.');
+        } catch (err) {
+            setErrorMsg(err.response?.data?.msg || 'Failed to delete job.');
+        }
+    };
+
+    // Recruiter: Update Candidate Stage via PATCH
+    const handleUpdateCandidateStage = async (appId, newStage) => {
+        try {
+            await applicationsAPI.updateStage(appId, newStage);
+            setCandidates(candidates.map(c => c._id === appId ? { ...c, currentStage: newStage } : c));
+            setActionMsg(`Candidate moved to stage "${newStage}".`);
+        } catch (err) {
+            setErrorMsg(err.response?.data?.msg || 'Failed to update candidate stage.');
+        }
+    };
+
+    // Candidate: Withdraw Application via DELETE
+    const handleWithdrawApplication = async (appId) => {
+        if (!window.confirm('Are you sure you want to withdraw your application?')) return;
+        try {
+            await applicationsAPI.delete(appId);
+            setMyApplications(myApplications.filter(a => a._id !== appId));
+            setActionMsg('Application withdrawn successfully.');
+        } catch (err) {
+            setErrorMsg(err.response?.data?.msg || 'Failed to withdraw application.');
+        }
+    };
+
+    // Filter jobs for Recruiter tab
+    const filteredRecruiterJobs = jobs.filter(j => {
+        if (jobFilterTab === 'active') return j.status === 'active';
+        if (jobFilterTab === 'closed') return j.status === 'closed';
+        return true;
     });
 
-    // Fetch Jobs & Applications
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!user) return;
-            try {
-                const token = localStorage.getItem('token');
-                const config = { headers: { 'x-auth-token': token } };
+    // Filter candidates for Recruiter
+    const filteredCandidates = stageFilter === 'All'
+        ? candidates
+        : candidates.filter(c => c.currentStage === stageFilter);
 
-                const jobsEndpoint = user.role === 'interviewer'
-                    ? '/jobs/my-jobs'
-                    : '/jobs';
+    // Filter jobs for Candidate
+    const filteredCandidateJobs = jobs.filter(j => {
+        const q = searchQuery.toLowerCase();
+        return (
+            j.title?.toLowerCase().includes(q) ||
+            j.companyName?.toLowerCase().includes(q) ||
+            j.location?.toLowerCase().includes(q) ||
+            (j.requirements && j.requirements.some(r => r.toLowerCase().includes(q)))
+        );
+    });
 
-                // Parallel fetch
-                const [jobsRes, appsRes] = await Promise.all([
-                    api.get(jobsEndpoint, config),
-                    user.role === 'candidate' ? api.get('/applications/my', config) : Promise.resolve({ data: [] })
-                ]);
-
-                // Ensure data is array
-                setJobs(Array.isArray(jobsRes.data) ? jobsRes.data : []);
-                if (appsRes.data) setApplications(Array.isArray(appsRes.data) ? appsRes.data : []);
-            } catch (err) {
-                console.error("Dashboard Fetch Error:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [user]);
-
-    // Fetch Candidates when a job is selected
-    useEffect(() => {
-        if (!activeJobId) return;
-
-        const fetchCandidates = async () => {
-            setLoadingCandidates(true);
-            try {
-                const token = localStorage.getItem('token');
-                const res = await api.get(`/applications/job/${activeJobId}`, {
-                    headers: { 'x-auth-token': token }
-                });
-                setJobCandidates(Array.isArray(res.data) ? res.data : []);
-            } catch (err) {
-                console.error("Fetch candidates failed", err);
-            } finally {
-                setLoadingCandidates(false);
-            }
-        };
-
-        fetchCandidates();
-    }, [activeJobId]);
-
-    const [isOpenToWork, setIsOpenToWork] = useState(user?.isOpenToWork || false);
-
-    useEffect(() => {
-        if (user) setIsOpenToWork(user.isOpenToWork);
-    }, [user]);
-
-    const handleToggleWork = async () => {
-        const newValue = !isOpenToWork;
-        setIsOpenToWork(newValue);
-        try {
-            const token = localStorage.getItem('token');
-            await api.put('/auth/profile', { isOpenToWork: newValue }, {
-                headers: { 'x-auth-token': token }
-            });
-        } catch (err) {
-            console.error(err);
-            setIsOpenToWork(!newValue);
-            alert('Failed to update status');
-        }
-    };
-
-    // Helper to check match status
-    const isJobMatch = (job) => {
-        if (!user || !user.skills || !job.requirements) return false;
-        const userSkills = user.skills.map(s => typeof s === 'string' ? s.toLowerCase() : '');
-        const jobRequirements = Array.isArray(job.requirements) ? job.requirements : [];
-        const jobSkills = jobRequirements.map(s => typeof s === 'string' ? s.toLowerCase() : '');
-        // Simple overlap check
-        return jobSkills.some(skill => userSkills.includes(skill) && skill !== '');
-    };
-
-    if (!user) return <div style={{ textAlign: 'center', marginTop: '4rem', color: '#64748b' }}>Loading Workspace...</div>;
-
-
-
-    const handleApplyClick = async (job) => {
-        const match = isJobMatch(job);
-        if (match) {
-            // Fast Track Apply
-            try {
-                const token = localStorage.getItem('token');
-                await api.post(`/applications/apply/${job._id}`, {}, {
-                    headers: { 'x-auth-token': token }
-                });
-                alert('Application sent successfully!');
-                const res = await api.get('/applications/my', { headers: { 'x-auth-token': token } });
-                setApplications(Array.isArray(res.data) ? res.data : []);
-            } catch (err) {
-                console.error(err);
-                alert(err.response?.data?.msg || 'Application failed');
-            }
-        } else {
-            // Open Manual Form
-            setSelectedJobForApply(job);
-            setApplyFormData({ relevantProjects: '', relevantExperience: '', resume: null });
-        }
-    };
-
-    const handleApplySubmit = async (e) => {
-        e.preventDefault();
-        if (!selectedJobForApply) return;
-
-        try {
-            const token = localStorage.getItem('token');
-            const data = new FormData();
-            data.append('relevantProjects', applyFormData.relevantProjects);
-            data.append('relevantExperience', applyFormData.relevantExperience);
-            if (applyFormData.resume) {
-                data.append('resume', applyFormData.resume);
-            }
-
-            await api.post(`/applications/apply/${selectedJobForApply._id}`, data, {
-                headers: {
-                    'x-auth-token': token,
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
-
-            alert('Manual Application sent successfully!');
-            setSelectedJobForApply(null); // Close modal
-            const res = await api.get('/applications/my', { headers: { 'x-auth-token': token } });
-            setApplications(Array.isArray(res.data) ? res.data : []);
-        } catch (err) {
-            console.error(err);
-            alert(err.response?.data?.msg || 'Application failed');
-        }
-    };
-
-    const handleShortlist = async (appId) => {
-        try {
-            const token = localStorage.getItem('token');
-            const config = { headers: { 'x-auth-token': token } };
-            await api.put(`/applications/${appId}/status`, { status: 'shortlisted' }, config);
-
-            // Update local state to show shortlisted status
-            setJobCandidates(prev => prev.map(app =>
-                app._id === appId ? { ...app, status: 'shortlisted' } : app
-            ));
-
-            alert('Candidate Shortlisted! An email has been sent.');
-        } catch (err) {
-            console.error("Shortlisting failed", err);
-            alert('Failed to shortlist candidate');
-        }
-    };
-
-    // Calculate Real Stats
-    const totalJobs = jobs.length;
-    const myAppsCount = applications.length;
-
-    // Calculate Matches (Robust Safeties)
-    const userSkills = (user.skills && Array.isArray(user.skills))
-        ? user.skills.map(s => typeof s === 'string' ? s.toLowerCase() : '')
-        : [];
-
-    const matchedJobsCount = jobs.filter(job => {
-        const jobRequirements = (job.requirements && Array.isArray(job.requirements)) ? job.requirements : [];
-        const jobSkills = jobRequirements.map(s => typeof s === 'string' ? s.toLowerCase() : '');
-        return jobSkills.some(skill => userSkills.includes(skill) && skill !== '');
-    }).length;
-
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1 }
-        }
-    };
-
-    const cardVariants = {
-        hidden: { opacity: 0, y: 10 },
-        visible: { opacity: 1, y: 0 }
-    };
+    if (loading) {
+        return (
+            <div className="dashboard-loading-state">
+                <div className="spinner-ring"></div>
+                <p>Loading enterprise workspace...</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="dashboard-container-pro">
-            {/* Professional Header */}
-            <div className="dashboard-header-pro">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5 }}
-                    >
-                        <h1 className="welcome-title">
-                            Welcome back, <span className="text-gradient">{user.role === 'candidate' ? user.fullName : user.companyName}</span>
-                        </h1>
-                        <p className="welcome-subtitle">
-                            {activeJobId ? 'Reviewing Applicants' : 'Your professional workspace overview.'}
-                        </p>
-                    </motion.div>
-
-                    <div style={{ width: '200px', height: '150px' }}>
-                        <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
-                            <ambientLight intensity={0.5} />
-                            <pointLight position={[10, 10, 10]} intensity={1.5} color="#6366f1" />
-                            <Suspense fallback={null}>
-                                <DashboardVisual3D />
-                                <Environment preset="city" />
-                            </Suspense>
-                        </Canvas>
+        <div className="dashboard-pro-container">
+            {/* Top Workspace Header */}
+            <div className="page-header-pro">
+                <div className="page-title-wrap">
+                    <h1>
+                        {user?.role === 'interviewer'
+                            ? `Recruiter Operations — ${user.companyName || 'Talent Hub'}`
+                            : `Candidate Career Dashboard`}
+                    </h1>
+                    <div className="page-subtitle">
+                        {user?.role === 'interviewer'
+                            ? 'Manage postings, track dynamic hiring pipelines, review AI candidate screening, and schedule Google Meet sessions.'
+                            : 'Explore open roles, track live application stages, and optimize your profile for automated ATS screening.'}
                     </div>
                 </div>
 
-                {user.role === 'candidate' && (
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleToggleWork}
-                        className={`status-toggle-pro ${isOpenToWork ? 'active' : ''}`}
-                    >
-                        <span className="status-dot"></span>
-                        {isOpenToWork ? 'Open to Work' : 'Not Looking'}
-                    </motion.button>
-                )}
-
-                {user.role === 'interviewer' && !activeJobId && (
-                    <Link to="/post-job" className="btn-primary-pro">
-                        Post New Job
-                    </Link>
-                )}
-                {user.role === 'interviewer' && activeJobId && (
-                    <button onClick={() => setActiveJobId(null)} className="btn-primary-pro" style={{ background: '#64748b', border: 'none', cursor: 'pointer' }}>
-                        ← Back to Jobs
-                    </button>
-                )}
+                <div className="header-action-group">
+                    {user?.role === 'interviewer' ? (
+                        <>
+                            <Link to="/post-job" className="btn-primary">
+                                + Create New Position
+                            </Link>
+                            {selectedJobId && (
+                                <Link to={`/schedule/${selectedJobId}`} className="btn-secondary">
+                                    📅 Schedule Session
+                                </Link>
+                            )}
+                        </>
+                    ) : (
+                        <Link to="/ats" className="btn-primary">
+                            ⚡ AI Resume Optimizer
+                        </Link>
+                    )}
+                </div>
             </div>
 
-            {/* REAL Stats Grid - Hide when viewing candidates */}
-            {!activeJobId && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1, duration: 0.5 }}
-                    className="stats-grid-pro"
-                >
-                    <div className="stat-card">
-                        <div className="stat-icon blue">💼</div>
-                        <div className="stat-info">
-                            <h3>{totalJobs}</h3>
-                            <p>{user.role === 'candidate' ? 'Active Jobs' : 'My Posted Jobs'}</p>
-                        </div>
-                    </div>
-
-                    {user.role === 'candidate' && (
-                        <>
-                            <div className="stat-card">
-                                <div className="stat-icon green">✨</div>
-                                <div className="stat-info">
-                                    <h3>{matchedJobsCount}</h3>
-                                    <p>Relevant Matches</p>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon purple">🚀</div>
-                                <div className="stat-info">
-                                    <h3>{myAppsCount}</h3>
-                                    <p>Applications</p>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {user.role === 'interviewer' && (
-                        <div className="stat-card">
-                            <div className="stat-icon purple">👥</div>
-                            <div className="stat-info">
-                                <h3>--</h3>
-                                <p>Total Candidates</p>
-                            </div>
-                        </div>
-                    )}
-                </motion.div>
+            {/* Notification & Error Banners */}
+            {actionMsg && (
+                <div className="alert-banner-success">
+                    <span>✅</span>
+                    <div>{actionMsg}</div>
+                    <button className="banner-close-btn" onClick={() => setActionMsg('')}>✕</button>
+                </div>
+            )}
+            {errorMsg && (
+                <div className="alert-banner-error">
+                    <span>⚠️</span>
+                    <div>{errorMsg}</div>
+                    <button className="banner-close-btn" onClick={() => setErrorMsg('')}>✕</button>
+                </div>
             )}
 
-            <div className="section-divider">
-                <h2>
-                    {activeJobId
-                        ? `Applicants for "${jobs.find(j => j._id === activeJobId)?.title || 'Job'}"`
-                        : (user.role === 'candidate' ? 'Recommended Opportunities' : 'Your Job Listings')
-                    }
-                </h2>
-                {user.role === 'candidate' && !activeJobId && (
-                    <div className="filter-tabs">
-                        <button className="filter-tab active">All</button>
-                    </div>
-                )}
-            </div>
-
-            {/* CANDIDATE VIEW MODE */}
-            {activeJobId ? (
-                loadingCandidates ? (
-                    <div className="loading-state"><div className="spinner"></div><p>Loading Candidates...</p></div>
-                ) : (
-                    <motion.div
-                        variants={containerVariants}
-                        initial="hidden"
-                        animate="visible"
-                        className="jobs-grid-3d"
-                    >
-                        {jobCandidates.length === 0 ? (
-                            <div className="empty-state-3d" style={{ gridColumn: '1/-1', textAlign: 'center', color: '#94a3b8', padding: '3rem' }}>
-                                <h3>No Applicants Yet</h3>
-                                <p>Candidates will appear here once they apply.</p>
+            {/* =========================================================================
+                RECRUITER WORKSPACE
+               ========================================================================= */}
+            {user?.role === 'interviewer' && (
+                <>
+                    {/* Top KPI Metrics Row */}
+                    <div className="metrics-grid-pro">
+                        <div className="metric-card-pro">
+                            <div className="metric-header">
+                                <span className="metric-title">Active Positions</span>
+                                <div className="metric-icon-wrap">💼</div>
                             </div>
-                        ) : (
-                            jobCandidates.map(app => (
-                                <motion.div
-                                    key={app._id}
-                                    variants={cardVariants}
-                                    whileHover={{ y: -4 }}
-                                    className="job-card-3d"
-                                    style={{ borderLeft: `4px solid ${app.aiScore >= 80 ? '#22c55e' : '#cbd5e1'}` }}
-                                >
-                                    <div className="card-content">
-                                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-                                            <div style={{
-                                                width: '50px', height: '50px', borderRadius: '50%', background: '#f1f5f9',
-                                                overflow: 'hidden', border: '2px solid white', boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                                            }}>
-                                                {app.candidate?.profilePicture ? (
-                                                    <img src={app.candidate.profilePicture} alt="pic" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                        onError={e => e.target.style.display = 'none'} />
-                                                ) : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</div>}
-                                            </div>
-                                            <div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{app.candidate?.fullName}</h3>
-                                                    {app.status === 'shortlisted' && (
-                                                        <span className="status-pill pill-active" style={{ fontSize: '0.6rem', padding: '0.1rem 0.5rem' }}>Shortlisted</span>
-                                                    )}
-                                                </div>
-                                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Applied: {new Date(app.appliedAt).toLocaleDateString()}</span>
-                                            </div>
-                                        </div>
+                            <div className="metric-value">
+                                {jobs.filter(j => j.status === 'active').length}
+                            </div>
+                            <div className="metric-caption">{jobs.length} total postings created</div>
+                        </div>
 
-                                        <div className="match-badge" style={{ marginBottom: '1rem' }}>
-                                            <span>⚡ {app.aiScore}% Match Score</span>
-                                        </div>
+                        <div className="metric-card-pro">
+                            <div className="metric-header">
+                                <span className="metric-title">Total Applicants</span>
+                                <div className="metric-icon-wrap">👥</div>
+                            </div>
+                            <div className="metric-value">
+                                {jobs.reduce((acc, j) => acc + (j.totalApplicants || 0), 0)}
+                            </div>
+                            <div className="metric-caption">Processed across all active pipelines</div>
+                        </div>
 
-                                        <div className="skills-cloud" style={{ marginBottom: '1.5rem' }}>
-                                            {app.candidate?.skills && app.candidate.skills.slice(0, 3).map((s, i) => (
-                                                <span key={i} className="skill-chip">{s}</span>
-                                            ))}
-                                        </div>
+                        <div className="metric-card-pro">
+                            <div className="metric-header">
+                                <span className="metric-title">Google Calendar</span>
+                                <div className="metric-icon-wrap">
+                                    {googleStatus.connected ? '🟢' : '⚪'}
+                                </div>
+                            </div>
+                            <div className="metric-value" style={{ fontSize: '1.25rem' }}>
+                                {googleStatus.connected ? 'Active Sync' : 'Not Connected'}
+                            </div>
+                            <div className="metric-caption">
+                                {googleStatus.connected ? googleStatus.googleEmail : 'Connect to automate Meet links'}
+                            </div>
+                        </div>
 
-                                        <div className="action-area">
-                                            <a href={app.candidate?.resume} target="_blank" rel="noreferrer" className="btn-apply-3d" style={{ textAlign: 'center', textDecoration: 'none', flex: 1 }}>
-                                                View Resume
-                                            </a>
-                                            <button
-                                                className={`btn-apply-3d ${app.status === 'shortlisted' ? '' : 'btn-match'}`}
-                                                style={{ marginLeft: '0.5rem', opacity: app.status === 'shortlisted' ? 0.6 : 1 }}
-                                                onClick={() => app.status !== 'shortlisted' && handleShortlist(app._id)}
-                                                disabled={app.status === 'shortlisted'}
-                                            >
-                                                {app.status === 'shortlisted' ? 'Shortlisted' : 'Shortlist'}
-                                            </button>
-                                        </div>
+                        <div className="metric-card-pro">
+                            <div className="metric-header">
+                                <span className="metric-title">Scheduled Sessions</span>
+                                <div className="metric-icon-wrap">🎥</div>
+                            </div>
+                            <div className="metric-value">
+                                {jobs.reduce((acc, j) => acc + (j.scheduledMeets?.length || 0), 0)}
+                            </div>
+                            <div className="metric-caption">Google Meet interview meetings</div>
+                        </div>
+                    </div>
+
+                    {/* Google OAuth Banner if not connected */}
+                    {!googleStatus.connected && (
+                        <div className="google-connect-banner card-pro">
+                            <div className="banner-left">
+                                <span className="banner-icon">📅</span>
+                                <div>
+                                    <div className="banner-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span>Connect Google Calendar for Automated Video Interviews</span>
+                                        {!user?.isPro ? (
+                                            <span className="badge badge-warning">PRO FEATURE</span>
+                                        ) : (
+                                            <span className="badge badge-success">⭐ PRO ACTIVE</span>
+                                        )}
                                     </div>
-                                </motion.div>
-                            ))
-                        )}
-                    </motion.div>
-                )
-            ) : (
-                /* NORMAL DASHBOARD VIEW */
-                loading ? (
-                    <div className="loading-state">
-                        <div className="spinner"></div>
-                        <p>Syncing Data...</p>
-                    </div>
-                ) : (
-                    <motion.div
-                        variants={containerVariants}
-                        initial="hidden"
-                        animate="visible"
-                        className="jobs-grid-3d"
-                    >
-                        {jobs.length === 0 ? (
-                            <div className="empty-state-3d" style={{ textAlign: 'center', gridColumn: '1/-1', padding: '4rem', color: '#94a3b8' }}>
-                                <h3>No Active Jobs Found</h3>
+                                    <div className="banner-desc">
+                                        Enable SkillSync to automatically create Google Calendar events with one-click Google Meet video links when scheduling rounds.
+                                    </div>
+                                </div>
                             </div>
-                        ) : (
-                            jobs.map(job => {
-                                // Client-side match check
-                                const jobRequirements = (job.requirements && Array.isArray(job.requirements)) ? job.requirements : [];
-                                const jobSkills = jobRequirements.map(s => typeof s === 'string' ? s.toLowerCase() : '');
-                                const isMatch = userSkills.some(skill => jobSkills.includes(skill) && skill !== '');
+                            {user?.isPro ? (
+                                <button 
+                                    className="btn-primary" 
+                                    onClick={handleConnectGoogle}
+                                    disabled={connectingGoogle}
+                                >
+                                    {connectingGoogle ? 'Redirecting to Google...' : 'Connect Google Calendar'}
+                                </button>
+                            ) : (
+                                <Link to="/subscription" className="btn-primary">
+                                    ⭐ Upgrade to PRO (from ₹299)
+                                </Link>
+                            )}
+                        </div>
+                    )}
 
-                                // Check if already applied
-                                const hasApplied = Array.isArray(applications) && applications.some(app => app.job && app.job._id === job._id);
+                    {/* Main Two-Column Recruiter Workspace */}
+                    <div className="recruiter-workspace-layout">
+                        {/* Left Column: Job Openings Panel */}
+                        <div className="jobs-panel card-pro">
+                            <div className="panel-title-bar">
+                                <div>
+                                    <h3>Job Openings ({jobs.length})</h3>
+                                    <p>Select a job to view ranked candidates and stages.</p>
+                                </div>
+                            </div>
 
-                                return (
-                                    <motion.div
-                                        key={job._id}
-                                        variants={cardVariants}
-                                        whileHover={{ y: -4 }}
-                                        className={`job-card-3d ${isMatch ? 'matched-glow' : ''}`}
-                                    >
-                                        <div className="card-content">
-                                            <div className="card-top">
-                                                <h3 className="job-title">{job.title}</h3>
-                                                <span className={`status-pill pill-${job.status}`}>
-                                                    {job.status || 'Active'}
+                            {/* Job Status Filter Tabs */}
+                            <div className="filter-tabs-row">
+                                <button 
+                                    className={`tab-btn ${jobFilterTab === 'all' ? 'active' : ''}`}
+                                    onClick={() => setJobFilterTab('all')}
+                                >
+                                    All ({jobs.length})
+                                </button>
+                                <button 
+                                    className={`tab-btn ${jobFilterTab === 'active' ? 'active' : ''}`}
+                                    onClick={() => setJobFilterTab('active')}
+                                >
+                                    Active ({jobs.filter(j => j.status === 'active').length})
+                                </button>
+                                <button 
+                                    className={`tab-btn ${jobFilterTab === 'closed' ? 'active' : ''}`}
+                                    onClick={() => setJobFilterTab('closed')}
+                                >
+                                    Closed ({jobs.filter(j => j.status === 'closed').length})
+                                </button>
+                            </div>
+
+                            {/* Job List Cards */}
+                            <div className="job-cards-list">
+                                {filteredRecruiterJobs.length === 0 ? (
+                                    <div className="empty-notice">
+                                        <p>No job postings found in this filter.</p>
+                                        <Link to="/post-job" className="btn-secondary btn-sm" style={{ marginTop: '10px' }}>
+                                            + Create Position
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    filteredRecruiterJobs.map(job => (
+                                        <div 
+                                            key={job._id}
+                                            className={`job-item-card ${selectedJobId === job._id ? 'selected' : ''}`}
+                                            onClick={() => selectJobForCandidates(job._id, job)}
+                                        >
+                                            <div className="job-card-top">
+                                                <h4 className="job-item-title">{job.title}</h4>
+                                                <span className={`badge ${job.status === 'active' ? 'badge-active' : 'badge-warning'}`}>
+                                                    {job.status}
                                                 </span>
                                             </div>
-                                            <p className="company-name">{job.companyName}</p>
 
-                                            <div className="meta-grid">
-                                                <div className="meta-item">
-                                                    <span className="icon">📍</span> {job.location}
-                                                </div>
-                                                <div className="meta-item">
-                                                    <span className="icon">💼</span> {job.experienceRequired} Years
-                                                </div>
-                                                <div className="meta-item full-width">
-                                                    <span className="icon">💰</span> {job.salary}
-                                                </div>
+                                            <div className="job-item-meta">
+                                                <span>📍 {job.location || 'Remote'}</span>
+                                                <span>👥 {job.totalApplicants || 0} Applicants</span>
                                             </div>
 
-                                            <div className="skills-cloud">
-                                                {jobRequirements.slice(0, 4).map((skill, index) => (
-                                                    <span key={index} className="skill-chip">
-                                                        {skill}
-                                                    </span>
-                                                ))}
-                                                {jobRequirements.length > 4 && <span className="skill-chip">+{jobRequirements.length - 4}</span>}
-                                            </div>
-
-                                            <div className="action-area">
-                                                {user.role === 'candidate' ? (
-                                                    <>
-                                                        {isMatch && (
-                                                            <div className="match-badge">
-                                                                <span>✨ Skill Match</span>
-                                                            </div>
-                                                        )}
-                                                        {hasApplied ? (
-                                                            <button disabled className="btn-apply-3d" style={{
-                                                                opacity: 1,
-                                                                cursor: 'default',
-                                                                background: applications.find(a => a.job?._id === job._id)?.status === 'shortlisted' ? '#ecfdf5' : '#f1f5f9',
-                                                                color: applications.find(a => a.job?._id === job._id)?.status === 'shortlisted' ? '#059669' : '#64748b',
-                                                                borderColor: applications.find(a => a.job?._id === job._id)?.status === 'shortlisted' ? '#10b981' : '#cbd5e1'
-                                                            }}>
-                                                                {applications.find(a => a.job?._id === job._id)?.status.toUpperCase() || 'Applied'}
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                onClick={() => handleApplyClick(job)}
-                                                                className={`btn-apply-3d ${isMatch ? 'btn-match' : ''}`}
-                                                            >
-                                                                {isMatch ? 'Apply Now' : 'Apply Job'}
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    /* INTERVIEWER ACTIONS */
-                                                    <button
-                                                        className="btn-apply-3d btn-match" style={{ width: '100%' }}
-                                                        onClick={() => setActiveJobId(job._id)}
+                                            <div className="job-card-actions" onClick={(e) => e.stopPropagation()}>
+                                                <Link 
+                                                    to={`/schedule/${job._id}`}
+                                                    className="card-action-btn"
+                                                    title="Schedule Session on Dedicated Page"
+                                                >
+                                                    📅 Schedule
+                                                </Link>
+                                                {job.status === 'active' && (
+                                                    <button 
+                                                        className="card-action-btn"
+                                                        onClick={() => handleCloseJobAndEmail(job._id)}
+                                                        title="Close job and receive candidate leaderboard email"
                                                     >
-                                                        View Applicants
+                                                        🔒 Close
                                                     </button>
                                                 )}
+                                                <button 
+                                                    className="card-action-btn danger"
+                                                    onClick={() => handleDeleteJob(job._id)}
+                                                    title="Delete Job"
+                                                >
+                                                    🗑️
+                                                </button>
                                             </div>
                                         </div>
-                                    </motion.div>
-                                );
-                            })
-                        )}
-                    </motion.div>
-                )
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right Column: Candidate Pipeline & AI Leaderboard */}
+                        <div className="candidates-pipeline-panel card-pro">
+                            {selectedJob ? (
+                                <>
+                                    <div className="pipeline-header-bar">
+                                        <div>
+                                            <div className="badge-line">
+                                                <span className={`badge ${selectedJob.status === 'active' ? 'badge-active' : 'badge-warning'}`}>
+                                                    {selectedJob.status}
+                                                </span>
+                                                {selectedJob.deadline && (
+                                                    <span className="deadline-tag">
+                                                        Deadline: {new Date(selectedJob.deadline).toLocaleDateString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h2>{selectedJob.title} — Candidate Roster</h2>
+                                            <p className="pipeline-subtitle">
+                                                Candidates automatically ranked by Gemini AI ATS fit score.
+                                            </p>
+                                        </div>
+
+                                        <div className="pipeline-cta-group">
+                                            <Link 
+                                                to={`/schedule/${selectedJob._id}`}
+                                                className="btn-primary btn-sm"
+                                            >
+                                                📅 Schedule Session (Dedicated Page)
+                                            </Link>
+                                        </div>
+                                    </div>
+
+                                    {/* Stage Filter Chips */}
+                                    <div className="stages-chip-row">
+                                        <button 
+                                            className={`stage-chip ${stageFilter === 'All' ? 'active' : ''}`}
+                                            onClick={() => setStageFilter('All')}
+                                        >
+                                            All Candidates ({candidates.length})
+                                        </button>
+                                        {(selectedJob.stages || ['Applied', 'Round 1', 'Technical', 'HR', 'Selected']).map((stg, i) => {
+                                            const count = candidates.filter(c => c.currentStage === stg).length;
+                                            return (
+                                                <button 
+                                                    key={i}
+                                                    className={`stage-chip ${stageFilter === stg ? 'active' : ''}`}
+                                                    onClick={() => setStageFilter(stg)}
+                                                >
+                                                    {stg} ({count})
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Candidates Table / Roster */}
+                                    {loadingCandidates ? (
+                                        <div className="pipeline-loading">
+                                            <div className="spinner-ring"></div>
+                                            <p>Retrieving AI-ranked candidate scores...</p>
+                                        </div>
+                                    ) : filteredCandidates.length === 0 ? (
+                                        <div className="empty-candidates-notice">
+                                            <div style={{ fontSize: '2.5rem' }}>📋</div>
+                                            <h4>No candidates in this stage</h4>
+                                            <p>Candidates will appear here as soon as they submit applications.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="candidates-table-wrap">
+                                            <table className="enterprise-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Rank & Candidate</th>
+                                                        <th>Gemini AI Score</th>
+                                                        <th>Current Stage</th>
+                                                        <th>Advance Stage</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {filteredCandidates.map((app, index) => {
+                                                        const aiScore = app.aiScore || 0;
+                                                        const scoreBadge = aiScore >= 80 ? 'badge-success' : aiScore >= 60 ? 'badge-warning' : 'badge-primary';
+                                                        return (
+                                                            <tr key={app._id}>
+                                                                <td>
+                                                                    <div className="candidate-cell">
+                                                                        <div className="rank-number">#{index + 1}</div>
+                                                                        <div className="candidate-cell-avatar">
+                                                                            {(app.candidate?.fullName || 'C').charAt(0).toUpperCase()}
+                                                                        </div>
+                                                                        <div>
+                                                                            <Link 
+                                                                                to={`/applicant/${app._id}`}
+                                                                                className="candidate-cell-name"
+                                                                            >
+                                                                                {app.candidate?.fullName || 'Anonymous Candidate'}
+                                                                            </Link>
+                                                                            <div className="candidate-cell-email">{app.candidate?.email}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <span className={`badge ${scoreBadge}`}>
+                                                                        {aiScore}% Match
+                                                                    </span>
+                                                                </td>
+                                                                <td>
+                                                                    <span className="current-stage-pill">
+                                                                        {app.currentStage || 'Applied'}
+                                                                    </span>
+                                                                </td>
+                                                                <td>
+                                                                    <select 
+                                                                        className="stage-select-dropdown"
+                                                                        value={app.currentStage || ''}
+                                                                        onChange={(e) => handleUpdateCandidateStage(app._id, e.target.value)}
+                                                                    >
+                                                                        {(selectedJob.stages || ['Applied', 'Round 1', 'Technical', 'HR', 'Selected']).map((s, idx) => (
+                                                                            <option key={idx} value={s}>{s}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </td>
+                                                                <td>
+                                                                    <div className="table-actions-cell">
+                                                                        <Link 
+                                                                            to={`/applicant/${app._id}`}
+                                                                            className="btn-secondary btn-sm"
+                                                                            title="Open full page dossier with AI report & resume"
+                                                                        >
+                                                                            Dossier
+                                                                        </Link>
+                                                                        <Link 
+                                                                            to={`/schedule/${selectedJob._id}?applicantId=${app._id}`}
+                                                                            className="btn-primary btn-sm"
+                                                                            title="Schedule individual interview session"
+                                                                        >
+                                                                            Meet
+                                                                        </Link>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="no-job-selected-view">
+                                    <div style={{ fontSize: '3rem' }}>💼</div>
+                                    <h3>Select a job opening</h3>
+                                    <p>Select a job from the left pane to manage applicant stages and schedule sessions.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
             )}
 
-            {/* MANUAL APPLICATION MODAL */}
-            <AnimatePresence>
-                {selectedJobForApply && (
-                    <motion.div
-                        className="modal-overlay"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setSelectedJobForApply(null)}
-                        style={{
-                            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                            background: 'rgba(5, 15, 30, 0.7)',
-                            backdropFilter: 'blur(8px)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            zIndex: 1000
-                        }}
-                    >
-                        <motion.div
-                            className="apply-modal"
-                            initial={{ scale: 0.9, y: 50, opacity: 0 }}
-                            animate={{ scale: 1, y: 0, opacity: 1 }}
-                            exit={{ scale: 0.9, y: 50, opacity: 0 }}
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                                background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-                                padding: '2.5rem',
-                                borderRadius: '24px',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                boxShadow: '0 25px 50px rgba(0,0,0,0.4)',
-                                width: '90%', maxWidth: '600px',
-                                color: 'white',
-                                position: 'relative'
-                            }}
+            {/* =========================================================================
+                CANDIDATE WORKSPACE
+               ========================================================================= */}
+            {user?.role === 'candidate' && (
+                <div className="candidate-workspace-wrap">
+                    {/* Candidate KPI Metrics */}
+                    <div className="metrics-grid-pro">
+                        <div className="metric-card-pro">
+                            <div className="metric-header">
+                                <span className="metric-title">Applications Submitted</span>
+                                <div className="metric-icon-wrap">📤</div>
+                            </div>
+                            <div className="metric-value">{myApplications.length}</div>
+                            <div className="metric-caption">Active in evaluation pipelines</div>
+                        </div>
+
+                        <div className="metric-card-pro">
+                            <div className="metric-header">
+                                <span className="metric-title">Available Positions</span>
+                                <div className="metric-icon-wrap">💼</div>
+                            </div>
+                            <div className="metric-value">{jobs.length}</div>
+                            <div className="metric-caption">Matching verified companies</div>
+                        </div>
+
+                        <div className="metric-card-pro">
+                            <div className="metric-header">
+                                <span className="metric-title">Average ATS Score</span>
+                                <div className="metric-icon-wrap">⚡</div>
+                            </div>
+                            <div className="metric-value">
+                                {myApplications.length > 0
+                                    ? Math.round(myApplications.reduce((acc, a) => acc + (a.aiScore || 0), 0) / myApplications.length)
+                                    : '—'}%
+                            </div>
+                            <div className="metric-caption">Calculated by Gemini AI screening</div>
+                        </div>
+                    </div>
+
+                    {/* Navigation Tabs for Candidate */}
+                    <div className="candidate-tabs-bar">
+                        <button 
+                            className={`candidate-nav-tab ${candidateTab === 'browse' ? 'active' : ''}`}
+                            onClick={() => setCandidateTab('browse')}
                         >
-                            <button
-                                onClick={() => setSelectedJobForApply(null)}
-                                style={{
-                                    position: 'absolute', top: '20px', right: '20px',
-                                    background: 'none', border: 'none', color: '#64748b',
-                                    fontSize: '1.5rem', cursor: 'pointer'
-                                }}
-                            >
-                                &times;
-                            </button>
+                            🔍 Explore Job Openings ({jobs.length})
+                        </button>
+                        <button 
+                            className={`candidate-nav-tab ${candidateTab === 'applications' ? 'active' : ''}`}
+                            onClick={() => setCandidateTab('applications')}
+                        >
+                            📋 My Applications ({myApplications.length})
+                        </button>
+                    </div>
 
-                            <h2 style={{ fontSize: '1.8rem', marginBottom: '0.5rem', background: 'linear-gradient(to right, #60a5fa, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                                Complete Application
-                            </h2>
-                            <p style={{ color: '#94a3b8', marginBottom: '2rem' }}>
-                                This job requires some additional details for consideration.
-                            </p>
+                    {/* Tab 1: Browse Jobs */}
+                    {candidateTab === 'browse' && (
+                        <div className="browse-jobs-section">
+                            <div className="search-filter-box card-pro">
+                                <input 
+                                    type="text"
+                                    className="input-field-pro"
+                                    placeholder="Search by job title, company, required skill, or location..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
 
-                            <form onSubmit={handleApplySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1', fontSize: '0.9rem' }}>
-                                        Featured Projects (Related to this role)
-                                    </label>
-                                    <textarea
-                                        className="form-input"
-                                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', resize: 'vertical' }}
-                                        rows="3"
-                                        value={applyFormData.relevantProjects}
-                                        onChange={(e) => setApplyFormData({ ...applyFormData, relevantProjects: e.target.value })}
-                                        placeholder="Describe 1-2 key projects..."
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1', fontSize: '0.9rem' }}>
-                                        Relevant Experience
-                                    </label>
-                                    <textarea
-                                        className="form-input"
-                                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', resize: 'vertical' }}
-                                        rows="3"
-                                        value={applyFormData.relevantExperience}
-                                        onChange={(e) => setApplyFormData({ ...applyFormData, relevantExperience: e.target.value })}
-                                        placeholder="Highlight specific experience for this JD..."
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1', fontSize: '0.9rem' }}>
-                                        Update Resume (Optional)
-                                    </label>
-                                    <div style={{ position: 'relative', overflow: 'hidden', display: 'inline-block' }}>
-                                        <input
-                                            type="file"
-                                            accept=".pdf,.doc,.docx"
-                                            onChange={(e) => setApplyFormData({ ...applyFormData, resume: e.target.files[0] })}
-                                            style={{ color: '#cbd5e1' }}
-                                        />
+                            <div className="candidate-jobs-grid">
+                                {filteredCandidateJobs.length === 0 ? (
+                                    <div className="empty-notice card-pro" style={{ gridColumn: '1 / -1' }}>
+                                        <p>No job postings match your search query.</p>
                                     </div>
-                                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-                                        If skipped, we will use your profile resume.
-                                    </p>
-                                </div>
+                                ) : (
+                                    filteredCandidateJobs.map(job => {
+                                        const alreadyApplied = myApplications.some(a => a.job?._id === job._id || a.job === job._id);
+                                        return (
+                                            <div key={job._id} className="candidate-job-card card-pro">
+                                                <div className="job-card-head">
+                                                    <div>
+                                                        <div className="job-company-badge">{job.companyName || 'Verified Partner'}</div>
+                                                        <h3 className="job-role-title">{job.title}</h3>
+                                                    </div>
+                                                    {job.deadline && (
+                                                        <span className="badge badge-warning">
+                                                            Due: {new Date(job.deadline).toLocaleDateString()}
+                                                        </span>
+                                                    )}
+                                                </div>
 
-                                <button
-                                    type="submit"
-                                    className="btn-apply-3d btn-match"
-                                    style={{ marginTop: '1rem', padding: '1rem', fontSize: '1rem' }}
-                                >
-                                    Submit Application
-                                </button>
-                            </form>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                                                <div className="job-meta-row">
+                                                    <span>📍 {job.location || 'Remote'}</span>
+                                                    {job.salary && <span>💰 {job.salary}</span>}
+                                                    <span>⏱️ {job.experienceRequired ? `${job.experienceRequired}+ Yrs` : 'Open'}</span>
+                                                </div>
+
+                                                <p className="job-snippet-desc">
+                                                    {job.description ? job.description.slice(0, 140) + '...' : ''}
+                                                </p>
+
+                                                {job.requirements && (
+                                                    <div className="job-tags-slice">
+                                                        {job.requirements.slice(0, 4).map((r, i) => (
+                                                            <span key={i} className="skill-chip">{r}</span>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                <div className="job-card-bottom-cta">
+                                                    {alreadyApplied ? (
+                                                        <span className="badge badge-success">✓ Applied</span>
+                                                    ) : (
+                                                        <Link 
+                                                            to={`/apply/${job._id}`}
+                                                            className="btn-primary"
+                                                            style={{ width: '100%' }}
+                                                        >
+                                                            Apply on Dedicated Page →
+                                                        </Link>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tab 2: My Applications */}
+                    {candidateTab === 'applications' && (
+                        <div className="my-applications-section card-pro">
+                            <h3>My Submitted Applications</h3>
+                            {myApplications.length === 0 ? (
+                                <div className="empty-notice">
+                                    <p>You haven't submitted any applications yet.</p>
+                                    <button 
+                                        className="btn-primary" 
+                                        onClick={() => setCandidateTab('browse')}
+                                        style={{ marginTop: '12px' }}
+                                    >
+                                        Browse Open Roles
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="candidates-table-wrap">
+                                    <table className="enterprise-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Position & Company</th>
+                                                <th>Applied Date</th>
+                                                <th>Hiring Stage</th>
+                                                <th>AI Fit Score</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {myApplications.map(app => {
+                                                const jobInfo = app.job || {};
+                                                return (
+                                                    <tr key={app._id}>
+                                                        <td>
+                                                            <strong>{jobInfo.title || 'Position'}</strong>
+                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                                {jobInfo.companyName || 'Company'}
+                                                            </div>
+                                                        </td>
+                                                        <td>{new Date(app.appliedAt).toLocaleDateString()}</td>
+                                                        <td>
+                                                            <span className="badge badge-info">
+                                                                {app.currentStage || 'Applied'}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span className={`badge ${app.aiScore >= 80 ? 'badge-success' : 'badge-primary'}`}>
+                                                                {app.aiScore || 0}%
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <button 
+                                                                className="btn-danger btn-sm"
+                                                                onClick={() => handleWithdrawApplication(app._id)}
+                                                            >
+                                                                Withdraw
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

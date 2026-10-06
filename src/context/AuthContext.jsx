@@ -13,13 +13,14 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const loadUser = async () => {
-        if (localStorage.getItem('token')) {
-            api.defaults.headers.common['x-auth-token'] = localStorage.getItem('token');
-        } else {
+        const token = localStorage.getItem('token');
+        if (!token) {
             delete api.defaults.headers.common['x-auth-token'];
             setLoading(false);
             return;
         }
+
+        api.defaults.headers.common['x-auth-token'] = token;
 
         try {
             const res = await api.get('/auth/me');
@@ -28,10 +29,12 @@ export const AuthProvider = ({ children }) => {
             return res.data;
         } catch (err) {
             localStorage.removeItem('token');
+            delete api.defaults.headers.common['x-auth-token'];
             setIsAuthenticated(false);
             setUser(null);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const register = async (formData) => {

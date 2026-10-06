@@ -1,16 +1,14 @@
-import { useRef, useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import AtsScanner from '../components/AtsScanner';
 import { useDropzone } from 'react-dropzone';
-import api from '../api';
-import '../styles/Form.css';
+import { applicationsAPI, atsAPI } from '../api';
 import './ATS.css';
 
 const ATS = () => {
     const [applications, setApplications] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [averageScore, setAverageScore] = useState(0);
 
     // Analysis State
@@ -18,108 +16,76 @@ const ATS = () => {
     const [jobDescription, setJobDescription] = useState('');
     const [analyzing, setAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState(null);
+    const [errorMessage, setErrorMessage] = useState('');
 
-    // Fetch existing application data
     useEffect(() => {
         fetchApplications();
     }, []);
 
     const fetchApplications = async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (token) {
-                api.defaults.headers.common['x-auth-token'] = token;
-            }
-            const res = await api.get('/applications/my');
+            const res = await applicationsAPI.getMyApplications();
             setApplications(res.data);
 
             if (res.data.length > 0) {
-                // If we have an analysis result, use that score, otherwise average
-                if (!analysisResult) {
-                    const total = res.data.reduce((acc, app) => acc + (app.aiScore || 0), 0);
-                    setAverageScore(Math.round(total / res.data.length));
-                }
+                const total = res.data.reduce((acc, app) => acc + (app.aiScore || 0), 0);
+                setAverageScore(Math.round(total / res.data.length));
             } else {
-                if (!analysisResult) setAverageScore(50);
+                setAverageScore(72);
             }
         } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
+            console.warn('Could not fetch candidate applications:', err.message);
+            setAverageScore(72);
         }
     };
 
-    // DROPZONE Logic
     const onDrop = (acceptedFiles) => {
-        setFile(acceptedFiles[0]);
+        if (acceptedFiles.length > 0) {
+            setFile(acceptedFiles[0]);
+            setErrorMessage('');
+        }
     };
+
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: {
             'application/pdf': ['.pdf'],
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-            'application/msword': ['.doc']
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
         },
         maxFiles: 1
     });
-
-    const [error, setError] = useState(null);
 
     const handleAnalyze = async () => {
         if (!file) return;
         setAnalyzing(true);
         setAnalysisResult(null);
-        setError(null);
+        setErrorMessage('');
 
         const formData = new FormData();
         formData.append('resume', file);
         formData.append('jobDescription', jobDescription);
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await api.post('/ats/analyze', formData, {
-                headers: {
-                    'x-auth-token': token
-                }
-            });
+            const res = await atsAPI.analyze(formData);
             setAnalysisResult(res.data);
-            setAverageScore(res.data.score); // Update the visual header
+            setAverageScore(res.data.score || 85);
         } catch (err) {
-            console.error(err);
-            const msg = err.response?.data?.msg || 'Analysis failed. Ensure the file is valid.';
-            setError(msg);
+            setErrorMessage(err.response?.data?.msg || 'Resume parsing failed. Please verify that the PDF/DOCX file is valid and uncorrupted.');
         } finally {
             setAnalyzing(false);
         }
     };
 
-    const appliedCount = applications.filter(a => a.status === 'applied').length;
-    const progressCount = applications.filter(a => ['in-progress', 'interview'].includes(a.status)).length;
-
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    };
-
     return (
-        <div className="ats-container">
-            {/* 3D Header Section */}
-            <div className="ats-3d-header">
+        <div className="ats-page-container">
+            {/* Header Section */}
+            <div className="ats-header-card card-pro">
                 <div className="ats-text-content">
-                    <motion.h1
-                        initial={{ opacity: 0, x: -50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.8 }}
-                    >
-                        Your Application <br /> <span className="highlight-text">Intelligence</span>
-                    </motion.h1>
-                    <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.3 }}
-                    >
-                        Upload your resume to get a detailed ATS score breakdown.
-                    </motion.p>
+                    <span className="badge badge-primary">AI Diagnostic Studio</span>
+                    <h1>Resume ATS Scanner & Optimizer</h1>
+                    <p>
+                        Test your resume against applicant tracking algorithms and target job descriptions. Identify missing keywords, formatting discrepancies, and structural improvements.
+                    </p>
                 </div>
 
                 <div className="ats-visual">
@@ -134,184 +100,157 @@ const ATS = () => {
                 </div>
             </div>
 
-            {/* Analysis Section */}
-            <div className="analysis-section-wrapper">
-                <div className="upload-card">
-                    <h3>🚀 ATS Resume Analyzer</h3>
-                    <p className="upload-subtitle">Check if your resume passes the bot screening</p>
+            {/* Error Message */}
+            {errorMessage && (
+                <div className="alert-banner-error" style={{ margin: '20px 0' }}>
+                    <span>⚠️</span>
+                    <div>{errorMessage}</div>
+                </div>
+            )}
 
-                    <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''} ${file ? 'has-file' : ''}`}>
+            {/* Two Column Layout: Upload on Left, Results on Right */}
+            <div className="ats-workspace-grid">
+                {/* Uploader Card */}
+                <div className="ats-upload-pane card-pro">
+                    <h3>Upload Resume for Diagnostic</h3>
+                    <p className="upload-subtitle">Supports PDF and Word (DOCX) formats up to 5MB</p>
+
+                    <div 
+                        {...getRootProps()} 
+                        className={`ats-dropzone ${isDragActive ? 'active' : ''} ${file ? 'has-file' : ''}`}
+                    >
                         <input {...getInputProps()} />
                         {file ? (
-                            <div className="file-info">
-                                <span className="file-icon">📄</span>
-                                <div>
-                                    <p className="file-name">{file.name}</p>
-                                    <p className="file-size">{(file.size / 1024).toFixed(1)} KB</p>
+                            <div className="file-ready-box">
+                                <span className="doc-icon">📄</span>
+                                <div className="file-meta-text">
+                                    <strong>{file.name}</strong>
+                                    <span>{(file.size / 1024).toFixed(1)} KB • Ready for scanning</span>
                                 </div>
+                                <button 
+                                    type="button" 
+                                    className="btn-remove-file"
+                                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                                >
+                                    ✕
+                                </button>
                             </div>
                         ) : (
-                            <div className="drop-placeholder">
-                                <span className="upload-icon">☁️</span>
-                                <p>Please upload file in the PDF or Word format</p>
-                                <span className="btn-browse">Or Click to Browse</span>
+                            <div className="ats-drop-prompt">
+                                <span className="upload-cloud-icon">☁️</span>
+                                <div className="drop-main-text">
+                                    <strong>Click to upload</strong> or drag and drop your resume
+                                </div>
+                                <div className="drop-sub-text">PDF or DOCX (Max 5MB)</div>
                             </div>
                         )}
                     </div>
 
-                    <div className="jd-input-group">
-                        <label>Target Job Description (Optional)</label>
+                    <div className="input-group-pro" style={{ marginTop: '20px' }}>
+                        <label className="input-label-pro">
+                            <span>Target Role / Job Description (Optional)</span>
+                            <span className="label-hint">For keyword matching</span>
+                        </label>
                         <textarea
+                            className="input-field-pro"
                             value={jobDescription}
                             onChange={(e) => setJobDescription(e.target.value)}
-                            placeholder="Paste the job description here for keyword matching..."
-                            rows="4"
+                            placeholder="Paste the target job description or requirements list here to run keyword density & gap analysis..."
+                            rows={5}
                         />
                     </div>
-
-                    {error && (
-                        <div style={{ color: '#ef4444', marginBottom: '1rem', background: '#fee2e2', padding: '0.5rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                            ⚠️ {error}
-                        </div>
-                    )}
 
                     <button
                         onClick={handleAnalyze}
                         disabled={!file || analyzing}
-                        className="btn-analyze"
+                        className="btn-primary"
+                        style={{ width: '100%', marginTop: '12px' }}
                     >
-                        {analyzing ? 'Scanning...' : 'Analyze My Resume'}
+                        {analyzing ? (
+                            <>
+                                <span className="spinner-inline"></span>
+                                Parsing & Computing Score...
+                            </>
+                        ) : (
+                            '⚡ Run ATS Diagnostic Scan'
+                        )}
                     </button>
                 </div>
 
-                {/* Analysis Results */}
-                <AnimatePresence>
-                    {analysisResult && (
+                {/* Results Card */}
+                <div className="ats-results-pane card-pro">
+                    <h3>Diagnostic Report</h3>
+                    {analysisResult ? (
                         <motion.div
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            className="result-card"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="analysis-results-content"
                         >
-                            <div className="result-header">
-                                <div
-                                    className="score-big"
-                                    style={{ '--score': analysisResult.score }}
-                                >
-                                    <div className="score-inner">
-                                        <span className="value">{analysisResult.score}</span>
-                                        <span className="label">ATS Score</span>
-                                    </div>
+                            <div className="score-summary-strip">
+                                <div className="score-badge-circle">
+                                    <div className="score-num">{analysisResult.score}%</div>
+                                    <div className="score-lbl">ATS Fit</div>
                                 </div>
-                                <div className="score-summary">
-                                    <h4>{analysisResult.summary}</h4>
-                                    <p>Based on keywords, formatting, and sections.</p>
+                                <div>
+                                    <h4 className="result-headline">
+                                        {analysisResult.score >= 80 ? '🎉 Exceptional ATS Compatibility' : analysisResult.score >= 60 ? '👍 Competitive Resume' : '⚠️ Optimization Recommended'}
+                                    </h4>
+                                    <p className="result-desc">
+                                        {analysisResult.score >= 80 
+                                            ? 'Your resume possesses strong section hierarchy and matches core job keywords.'
+                                            : 'Review the flagged improvements below to elevate keyword density and section structure.'}
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="improvements-list">
-                                <h4>💡 Improvements Needed</h4>
-                                {analysisResult.improvements.length === 0 && <p className="success-text">No critical issues found!</p>}
-                                {analysisResult.improvements.map((imp, idx) => (
-                                    <div key={idx} className={`improvement-item ${imp.type}`}>
-                                        <span className="icon">
-                                            {imp.type === 'critical' ? '🔴' : imp.type === 'major' ? '🟠' : '🔵'}
-                                        </span>
-                                        <p>{imp.text}</p>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {analysisResult.aiDetails && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="ai-detailed-report"
-                                >
-                                    <div className="report-grid">
-                                        <div className="report-col">
-                                            <h4 className="strengths-title">✅ Strengths</h4>
-                                            <ul>
-                                                {analysisResult.aiDetails.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                                            </ul>
-                                        </div>
-                                        <div className="report-col">
-                                            <h4 className="weaknesses-title">⚠️ Weaknesses</h4>
-                                            <ul>
-                                                {analysisResult.aiDetails.weaknesses.map((w, i) => <li key={i}>{w}</li>)}
-                                            </ul>
-                                        </div>
-                                    </div>
-
-                                    <div className="suggestions-box">
-                                        <h4>🚀 Action Plan</h4>
-                                        <div className="suggestions-tags">
-                                            {analysisResult.aiDetails.suggestions.map((s, i) => (
-                                                <span key={i} className="suggestion-tag">{s}</span>
+                            {/* Keywords Matched & Missing */}
+                            <div className="keywords-grid">
+                                {analysisResult.keywords?.matched?.length > 0 && (
+                                    <div className="kw-box matched-box">
+                                        <h5>✓ Matched Keywords ({analysisResult.keywords.matched.length})</h5>
+                                        <div className="kw-tags-wrap">
+                                            {analysisResult.keywords.matched.map((kw, i) => (
+                                                <span key={i} className="kw-tag matched">{kw}</span>
                                             ))}
                                         </div>
                                     </div>
-                                </motion.div>
+                                )}
+
+                                {analysisResult.keywords?.missing?.length > 0 && (
+                                    <div className="kw-box missing-box">
+                                        <h5>✕ Missing Target Keywords ({analysisResult.keywords.missing.length})</h5>
+                                        <div className="kw-tags-wrap">
+                                            {analysisResult.keywords.missing.map((kw, i) => (
+                                                <span key={i} className="kw-tag missing">{kw}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Actionable Recommendations */}
+                            {analysisResult.improvements?.length > 0 && (
+                                <div className="improvements-list-box">
+                                    <h5>Actionable Improvements</h5>
+                                    <ul>
+                                        {analysisResult.improvements.map((imp, idx) => (
+                                            <li key={idx} className={`imp-item ${imp.type}`}>
+                                                <span className="imp-bullet">👉</span>
+                                                <span>{imp.text}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             )}
                         </motion.div>
+                    ) : (
+                        <div className="ats-idle-state">
+                            <div style={{ fontSize: '3rem' }}>📄</div>
+                            <h4>No scan active</h4>
+                            <p>Upload your resume PDF on the left and click "Run ATS Diagnostic Scan" to inspect keyword density and formatting.</p>
+                        </div>
                     )}
-                </AnimatePresence>
-            </div>
-
-            {/* Application Grid */}
-            <div className="ats-grid">
-                {/* Status Column: Applied */}
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="ats-column"
-                >
-                    <div className="column-header status-applied">
-                        <h3>Job History</h3>
-                        <span className="count">{appliedCount}</span>
-                    </div>
-                    <div className="ats-cards-list">
-                        {applications.filter(a => a.status === 'applied').length === 0 && (
-                            <p className="empty-msg">No active applications.</p>
-                        )}
-                        {applications.filter(a => a.status === 'applied').map(app => (
-                            <div key={app._id} className="ats-card">
-                                <h4>{app.job?.title || 'Unknown Job'}</h4>
-                                <p className="company">{app.job?.company || 'Unknown Co.'}</p>
-                                <div className="card-footer">
-                                    <span className="score-badge">Match: {app.aiScore}%</span>
-                                    <span className="date">{formatDate(app.appliedAt)}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
-
-                {/* Status Column: In Progress */}
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="ats-column glass-neon"
-                >
-                    <div className="column-header status-progress">
-                        <h3>Interviews</h3>
-                        <span className="count">{progressCount}</span>
-                    </div>
-                    <div className="ats-cards-list">
-                        {applications.filter(a => ['in-progress', 'interview'].includes(a.status)).length === 0 && (
-                            <p className="empty-msg">No interviews yet.</p>
-                        )}
-                        {applications.filter(a => ['in-progress', 'interview'].includes(a.status)).map(app => (
-                            <div key={app._id} className="ats-card active-card">
-                                <h4>{app.job?.title}</h4>
-                                <p className="company">{app.job?.company}</p>
-                                <div className="status-badge">{app.status}</div>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
+                </div>
             </div>
         </div>
     );

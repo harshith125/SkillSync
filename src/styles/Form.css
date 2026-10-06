@@ -1,345 +1,193 @@
-/* --- Full Screen Enterprise Split Layout --- */
-
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
-body,
-html {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    /* Allow body scroll for better UX */
-    overflow-x: hidden;
-    overflow-y: auto;
-}
-
-.form-container,
-.form-container * {
+/* Executive Auth & Form Card Styling - Light Theme */
+.form-container {
+    max-width: 440px;
+    margin: 2.5rem auto 3rem auto;
+    padding: 2rem 1.75rem;
+    background: #ffffff;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-sm);
+    position: relative;
     box-sizing: border-box;
 }
 
-/* Page Wrapper */
-.register-page {
-    width: 100%;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    padding: 2rem;
-}
-
-/* Card Container */
-.form-container {
-    display: flex;
-    flex-direction: row;
-    width: 100%;
-    max-width: 1100px;
-    height: 750px;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: 24px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-    position: relative;
-}
-
-/* Left - Visual Brand Area */
-.form-left {
-    flex: 0 0 40%;
-    width: 40%;
-    height: 100%;
-    position: relative;
-    background: #0f172a;
-    background: radial-gradient(circle at top right, var(--primary, #6366f1), #1e1b4b);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 4rem 3rem;
-    /* Adjusted for card size */
-    color: white;
-    overflow: hidden;
-    z-index: 10;
-}
-
-/* Abstract Background Shapes/Glow */
-.form-left::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-        radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-        radial-gradient(circle at 90% 90%, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-    background-size: 40px 40px;
-    opacity: 0.3;
-}
-
-.visual-content {
-    position: relative;
-    z-index: 10;
-}
-
-.visual-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 3.5rem;
-    font-weight: 800;
-    line-height: 1.1;
-    margin-bottom: 2rem;
-    letter-spacing: -0.03em;
-}
-
-.visual-text {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.25rem;
-    line-height: 1.6;
-    color: rgba(255, 255, 255, 0.85);
-    max-width: 90%;
-}
-
-/* Right - Form Area */
-.form-right {
-    flex: 1;
-    width: 60%;
-    height: 100%;
-    overflow-y: auto;
-    padding: 3rem 4rem;
-    background: rgba(255, 255, 255, 0.5);
-    display: flex;
-    flex-direction: column;
-}
-
-/* Form Styling */
 .form-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 2rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin-bottom: 0.5rem;
+    text-align: center;
+    margin-bottom: 0.35rem;
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
 }
 
 .form-subtitle {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1rem;
-    color: #64748b;
-    margin-bottom: 2.5rem;
+    text-align: center;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    margin-bottom: 1.25rem;
 }
 
 .role-toggle {
-    display: inline-flex;
-    width: fit-content;
-    /* Prevent stretching in flex column */
+    display: flex;
     background: #f1f5f9;
-    padding: 4px;
-    border-radius: 12px;
-    margin-bottom: 2rem;
-    position: relative;
-    z-index: 50;
-    /* Ensure clickable */
+    padding: 3px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 1.25rem;
+    border: 1px solid var(--border-subtle);
 }
 
 .role-btn {
-    padding: 0.75rem 2rem;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-weight: 600;
-    color: #64748b;
+    flex: 1;
+    text-align: center;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--radius-xs);
     cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    z-index: 51;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    background: transparent;
+    border: none;
 }
 
 .role-btn.active {
-    background: white;
-    color: #0f172a;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    background: #ffffff;
+    color: var(--primary);
+    box-shadow: var(--shadow-xs);
+    border: 1px solid var(--border-medium);
 }
 
 .form-group {
-    margin-bottom: 1.5rem;
-    position: relative;
-    z-index: 40;
+    margin-bottom: 1rem;
 }
 
 .form-label {
     display: block;
-    margin-bottom: 0.5rem;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 0.9rem;
+    margin-bottom: 0.35rem;
+    font-family: var(--font-heading);
     font-weight: 600;
-    color: #334155;
+    font-size: 0.82rem;
+    color: var(--text-primary);
 }
 
 .form-input,
+.form-select,
 .form-textarea {
     width: 100%;
-    padding: 0.875rem 1rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1rem;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    color: var(--text-primary);
     background: #ffffff;
-    transition: all 0.2s;
-    color: #0f172a;
+    transition: all var(--transition-fast);
+    box-sizing: border-box;
 }
 
 .form-input:focus,
+.form-select:focus,
 .form-textarea:focus {
     outline: none;
-    border-color: var(--primary, #6366f1);
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
-/* Enhancements for "Top Company" feel */
-.form-input:focus,
-.form-textarea:focus {
-    transform: translateY(-2px);
-    border-color: var(--primary, #6366f1);
-    box-shadow: 0 8px 16px -4px rgba(99, 102, 241, 0.1);
+.form-input::placeholder,
+.form-textarea::placeholder {
+    color: var(--text-disabled);
 }
 
 .btn-block {
     width: 100%;
-    padding: 1rem;
-    margin-top: 1rem;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 1.1rem;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.9rem;
+    margin-top: 1.25rem;
+    background: var(--primary);
+    color: #ffffff;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-heading);
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-
-    /* Animated Gradient Background */
-    background-size: 200% auto;
-    background-image: linear-gradient(to right, var(--primary) 0%, #818cf8 51%, var(--primary) 100%);
-    transition: 0.5s;
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-xs);
 }
 
 .btn-block:hover {
-    background-position: right center;
-    transform: translateY(-2px);
-    box-shadow: 0 12px 20px -8px rgba(99, 102, 241, 0.4);
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+.btn-block:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 .form-footer {
-    margin-top: 2rem;
     text-align: center;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    color: #64748b;
+    margin-top: 1.25rem;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
 }
 
-.form-link {
-    color: var(--primary, #6366f1);
+.form-footer a {
+    color: var(--primary);
     font-weight: 600;
-    text-decoration: none;
 }
 
-@keyframes float {
-    0% {
-        transform: translateY(0px);
-    }
-
-    50% {
-        transform: translateY(-10px);
-    }
-
-    100% {
-        transform: translateY(0px);
-    }
+.form-footer a:hover {
+    text-decoration: underline;
 }
 
-@keyframes pulse-glow {
-    0% {
-        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
-    }
-}
-
-/* Multi-step Tab Navigation */
-.form-tabs {
+.auth-error-box {
+    background: var(--rose-subtle);
+    border: 1px solid var(--rose-border);
+    color: #991b1b;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
     display: flex;
-    background: #f1f5f9;
-    padding: 6px;
-    border-radius: 16px;
-    margin-bottom: 2rem;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Password Eye Toggle Input */
+.password-input-wrapper {
+    position: relative;
     width: 100%;
-    justify-content: space-between;
-    position: relative;
-    z-index: 40;
+    display: flex;
+    align-items: center;
 }
 
-.tab-btn {
-    flex: 1;
-    text-align: center;
-    padding: 0.8rem 0.5rem;
-    border-radius: 12px;
-    border: none;
-    background: transparent;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: #64748b;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
+.password-input-wrapper .form-input {
+    padding-right: 2.75rem;
 }
 
-.tab-btn.active {
-    background: white;
-    color: var(--primary, #6366f1);
-}
-
-/* Add a subtle indicator or border if requested, but the image shows a card-like active state */
-.tab-btn.active::after {
-    content: '';
+.password-toggle-btn {
     position: absolute;
-    inset: 0;
-    border-radius: 12px;
-    border: 2px solid var(--primary, #6366f1);
-    opacity: 0.1;
+    right: 0.65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #64748b;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-/* Mobile Responsive */
-@media (max-width: 960px) {
-    .form-container {
-        display: flex;
-        /* Fallback or switch to flex column */
-        flex-direction: column;
-        height: auto;
-        min-height: 100vh;
-        overflow-y: auto;
-    }
+.password-toggle-btn:hover {
+    color: var(--primary);
+    background: #f1f5f9;
+}
 
-    .form-left {
-        width: 100%;
-        /* Full width mobile */
-        position: relative;
-        height: auto;
-        min-height: 250px;
-        padding: 3rem 2rem;
-    }
-
-    .visual-title {
-        font-size: 2rem;
-    }
-
-    .form-right {
-        margin-left: 0;
-        width: 100%;
-        padding: 2rem;
-        height: auto;
-        overflow: visible;
-        border-radius: 30px 30px 0 0;
-        /* Card look on mobile */
-        margin-top: -40px;
-        z-index: 20;
-        box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.05);
-    }
+.password-toggle-btn:focus {
+    outline: none;
+    color: var(--primary);
 }
