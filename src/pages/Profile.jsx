@@ -2,8 +2,8 @@ import { useState, useContext, useEffect, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
-import api from '../api';
 import AuthContext from '../context/AuthContext';
+import { authAPI } from '../api';
 import ProfileIdentity from '../components/ProfileIdentity';
 import './Profile.css';
 
@@ -160,13 +160,9 @@ const Profile = () => {
         }
 
         try {
-            const token = localStorage.getItem('token');
-            await api.put('/auth/profile', payload, {
-                headers: { 'x-auth-token': token }
-            });
+            await authAPI.updateProfile(payload);
             await loadUser();
             setMsg({ type: 'success', text: 'Profile Updated Successfully!' });
-            // window.scrollTo(0, 0); // No need to jump, message is enough
         } catch (err) {
             console.error(err);
             setMsg({ type: 'error', text: err.response?.data?.msg || 'Update failed' });
@@ -184,12 +180,7 @@ const Profile = () => {
 
         try {
             setLoading(true);
-            const token = localStorage.getItem('token');
-            const res = await api.post('/auth/profile-picture', formData, {
-                headers: {
-                    'x-auth-token': token
-                }
-            });
+            const res = await authAPI.uploadProfilePicture(formData);
 
             // Update local state with new image
             setFormData(prev => ({ ...prev, profilePicture: res.data.profilePicture }));

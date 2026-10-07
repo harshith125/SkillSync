@@ -1,0 +1,348 @@
+.applicant-detail-page {
+    max-width: 1240px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.applicant-header-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+    padding: 18px 22px;
+}
+
+.candidate-primary-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.candidate-big-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-full);
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-weight: 800;
+}
+
+.candidate-headline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.candidate-headline h1 {
+    font-size: 1.4rem;
+    font-weight: 800;
+}
+
+.candidate-submeta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    flex-wrap: wrap;
+}
+
+.header-action-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Two Column Content Grid */
+.applicant-content-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 0.7fr;
+    gap: 18px;
+    align-items: flex-start;
+}
+
+/* Stage Controller Card */
+.stage-controller-card {
+    margin-bottom: 18px;
+}
+
+.stage-controller-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.stage-controller-header h3 {
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.stage-controller-header p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.stages-pills-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.stage-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid var(--border-medium);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.stage-pill-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: #eff6ff;
+}
+
+.stage-pill-btn.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+}
+
+.stage-pill-btn:disabled {
+    opacity: 0.75;
+    cursor: default;
+}
+
+.stage-num {
+    width: 18px;
+    height: 18px;
+    border-radius: var(--radius-full);
+    background: rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68rem;
+}
+
+/* AI Screening Report */
+.ai-dossier-card {
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    padding: 20px;
+}
+
+.ai-report-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.ai-report-top h3 {
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.ai-report-top p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.ai-score-donut {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-full);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ai-score-donut.emerald {
+    background: #ecfdf5;
+    border: 2px solid var(--emerald);
+    color: var(--emerald);
+}
+
+.ai-score-donut.amber {
+    background: #fffbeb;
+    border: 2px solid var(--amber);
+    color: var(--amber);
+}
+
+.ai-score-donut.rose {
+    background: #fef2f2;
+    border: 2px solid var(--rose);
+    color: var(--rose);
+}
+
+.donut-value {
+    font-family: var(--font-heading);
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.donut-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+}
+
+.ai-summary-block {
+    background: #f8fafc;
+    border-left: 3px solid var(--primary);
+    padding: 10px 14px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    margin-bottom: 16px;
+}
+
+.ai-summary-block h4 {
+    font-size: 0.82rem;
+    color: var(--primary);
+    margin-bottom: 2px;
+}
+
+.ai-summary-block p {
+    color: var(--text-primary);
+    line-height: 1.5;
+    font-size: 0.84rem;
+}
+
+.sw-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.sw-column {
+    border-radius: var(--radius-sm);
+    padding: 12px;
+}
+
+.strengths-col {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+}
+
+.strengths-col h4 {
+    color: #166534;
+    font-size: 0.84rem;
+    margin-bottom: 6px;
+}
+
+.weaknesses-col {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+}
+
+.weaknesses-col h4 {
+    color: #92400e;
+    font-size: 0.84rem;
+    margin-bottom: 6px;
+}
+
+.sw-column ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sw-column li {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* Resume Box */
+.resume-download-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-top: 10px;
+}
+
+.doc-icon {
+    font-size: 1.5rem;
+}
+
+.doc-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.84rem;
+}
+
+.doc-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.candidate-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 6px;
+}
+
+.info-label {
+    color: var(--text-muted);
+}
+
+.info-val {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.applicant-detail-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    gap: 12px;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+    .applicant-content-grid {
+        grid-template-columns: 1fr;
+    }
+    .sw-grid {
+        grid-template-columns: 1fr;
+    }
+}
