@@ -35,5 +35,11 @@
     "react-dom": "$react-dom",
     "@types/react": "$@types/react",
     "@types/react-dom": "$@types/react-dom"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "0.27.2"
   }
 }
